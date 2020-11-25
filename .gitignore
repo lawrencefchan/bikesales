@@ -1,5 +1,10 @@
 # driver
 chromedriver*
 
-# response
+# generated files
 url_response.txt
+*.csv
+
+# user settings
+.vscode
+env
