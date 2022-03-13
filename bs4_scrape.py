@@ -1,10 +1,10 @@
 '''
 Considerations:
-    * It is difficult to determine bike condition by merely scraping data
+    * How to determine bike condition?
     * What to do about duplicate entries scraped over multiple days?
+    * How to tell between missing KMs & new bikes?
 
 TODO:
-    * How to tell between missing KMs & new bikes?
     * NLP for scrapped/written-off/parts bikes
 '''
 
@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 import json
 
 import pandas as pd
-import time
+from datetime import datetime
 
 
 url = ('https://www.bikesales.com.au/bikes/?q=(And.('
@@ -22,11 +22,13 @@ url = ('https://www.bikesales.com.au/bikes/?q=(And.('
        'C.Type.Road._.(Or.SubType.Naked._.SubType.Super+Sport.))_'
        '.Price.range(..10000).)&sort=Price')
 
-headers = {'Accept': 'text/html,application/xhtml+xml,application/xml;',
-           'Accept-Encoding': 'gzip',
-           'Accept-Language': 'zh-CN,zh;q=0.8', 'Referer': 'http://www.example.com/',
-           'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) '
-           'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36'}
+headers = {
+    'Accept': 'text/html,application/xhtml+xml,application/xml;',
+    'Accept-Encoding': 'gzip',
+    'Accept-Language': 'zh-CN,zh;q=0.8', 'Referer': 'http://www.example.com/',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36'
+    }
 
 default_keys = ['@type',
                 'url',
@@ -40,7 +42,7 @@ default_keys = ['@type',
                 'image']
 
 
-def get_page_content(offset, ):    
+def get_page_content(offset):    
     # --- run request
     res = requests.get(url+f'&offset={offset}', headers=headers)
     assert res.status_code == 200
@@ -115,27 +117,27 @@ def munge_content(content: list) -> list:
 
     return arr
 
-# %%
-arr = []
 
-# --- first page (get number of items to scrape)
-page = 1
-json_obj = get_page_content(0)
-n_items = json_obj['mainEntity']['numberOfItems']
+def scrape_data():
+    arr = []
 
-arr += munge_content(json_obj['mainEntity']['itemListElement'])
-offset = len(json_obj['mainEntity']['itemListElement'])
+    # --- first page (get number of items to scrape)
+    page = 1
+    json_obj = get_page_content(0)
+    n_items = json_obj['mainEntity']['numberOfItems']
 
-
-while offset < n_items and page < 100:  # scrape max 20 pages
-    t_start = time.time()
-    json_obj = get_page_content(offset)
     arr += munge_content(json_obj['mainEntity']['itemListElement'])
-    offset += len(json_obj['mainEntity']['itemListElement'])
-    page += 1
-    t_end = time.time()
-    print(f'Page {page}', t_end - t_start)
+    offset = len(json_obj['mainEntity']['itemListElement'])
 
-# %%
-pd.DataFrame(arr).to_csv(f'{datetime.datetime.now().strftime("%Y%m%d")}.csv', index=False)
 
+    while offset < n_items and page < 100:  # scrape max n pages
+        t_start = datetime.now()
+        json_obj = get_page_content(offset)
+        arr += munge_content(json_obj['mainEntity']['itemListElement'])
+        offset += len(json_obj['mainEntity']['itemListElement'])
+        page += 1
+        print(f'Page {page}, scrape took {datetime.now() - t_start}')
+
+    df = pd.DataFrame(arr)
+
+    return df
