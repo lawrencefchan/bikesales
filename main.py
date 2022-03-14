@@ -2,7 +2,8 @@
 # %%
 
 from bs4_scrape import scrape_data
-import create_db as db
+from create_db import write_to_db
+
 
 def munge_df(df, df_dims):
     df['year'] = df['name'].str[:4].astype(int)  # get model year
@@ -45,5 +46,5 @@ df_dims = df[['model', 'brand', 'bodyType']].drop_duplicates()
 df_dims = munge_dim_table(df_dims)
 df = munge_df(df, df_dims)
 
-db.write_listings_fact(df)
-db.write_model_dims(df_dims)
+write_to_db(df, 'listings_fact')
+write_to_db(df_dims, 'model_dims')
