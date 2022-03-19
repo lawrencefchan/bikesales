@@ -1,11 +1,9 @@
 '''
-Considerations:
+TODO:
+    * NLP for scrapped/written-off/parts bikes
     * How to determine bike condition?
     * What to do about duplicate entries scraped over multiple days?
     * How to tell between missing KMs & new bikes?
-
-TODO:
-    * NLP for scrapped/written-off/parts bikes
 '''
 
 # %%
@@ -13,12 +11,15 @@ import requests
 from bs4 import BeautifulSoup
 import json
 
+from typing import Tuple, Union
 import pandas as pd
 from datetime import datetime
 
+from munge import munge_dim_table, munge_fact_table
 
 url = ('https://www.bikesales.com.au/bikes/?q=(And.('
-       'Or.Make.BMW._.Make.Honda._.Make.Kawasaki._.Make.Suzuki._.Make.Triumph._.Make.Yamaha.)_.('
+       'Or.Make.BMW._.Make.Honda._.Make.Kawasaki._.Make.Suzuki._.Make.Triumph.'
+       '_.Make.Yamaha.)_.('
        'C.Type.Road._.(Or.SubType.Naked._.SubType.Super+Sport.))_'
        '.Price.range(..10000).)&sort=Price')
 
@@ -42,7 +43,7 @@ default_keys = ['@type',
                 'image']
 
 
-def get_page_content(offset):    
+def get_page_content(offset):
     # --- run request
     res = requests.get(url+f'&offset={offset}', headers=headers)
     assert res.status_code == 200
@@ -58,7 +59,7 @@ def get_page_content(offset):
 
 def munge_nested_dict(d):
     # flatten dictionary and remove poo
-    try :
+    try:
         key = d['@type']
         if key == 'Brand':
             munged = d['name']
@@ -82,7 +83,7 @@ def munge_content(content: list) -> list:
     '''
     content : list
         json_obj['mainEntity']['itemListElement']
-    
+
     Returns munged list with useless info deleted from content list
     '''
     arr = []
@@ -118,7 +119,16 @@ def munge_content(content: list) -> list:
     return arr
 
 
-def scrape_data():
+def scrape_data(
+    n_pages: Union[int, str] = 100
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    '''
+    n_pages: maximum number of pages to scrape
+
+    Returns scraped data as a tuple: (fact table, dims table)
+
+    TODO: add 'all' string to n_pages to scrape every single listing
+    '''
     arr = []
 
     # --- first page (get number of items to scrape)
@@ -129,8 +139,7 @@ def scrape_data():
     arr += munge_content(json_obj['mainEntity']['itemListElement'])
     offset = len(json_obj['mainEntity']['itemListElement'])
 
-
-    while offset < n_items and page < 100:  # scrape max n pages
+    while offset < n_items and page < n_pages:
         t_start = datetime.now()
         json_obj = get_page_content(offset)
         arr += munge_content(json_obj['mainEntity']['itemListElement'])
@@ -138,6 +147,9 @@ def scrape_data():
         page += 1
         print(f'Page {page}, scrape took {datetime.now() - t_start}')
 
-    df = pd.DataFrame(arr)
+    df_raw = pd.DataFrame(arr)
 
-    return df
+    df_dims = munge_dim_table(df_raw)
+    df_fact = munge_fact_table(df_raw, df_dims)
+
+    return df_fact, df_dims

@@ -1,9 +1,4 @@
-# driver
-chromedriver*
-
-# generated files
-url_response.txt
-*.csv
+__pycache__
 
 # user settings
 .vscode

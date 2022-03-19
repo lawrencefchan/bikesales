@@ -2,24 +2,7 @@
 # %%
 
 from bs4_scrape import scrape_data
-from create_db import write_to_db
-
-
-def munge_df(df, df_dims):
-    df['year'] = df['name'].str[:4].astype(int)  # get model year
-    assert not df['flagged'].any()  # TODO: handle these cases
-
-    df = df.merge(df_dims[['modelId', 'model']], on='model') \
-           .drop(['name', 'model', 'brand', 'bodyType', 'flagged'], axis=1)
-
-    # TODO: compress URL
-
-    return df
-
-
-def munge_dim_table(df_dims):
-    df_dims['modelId'] = df_dims.index + 100000
-    return df_dims
+from create_db import query_db, write_to_db
 
 
 def check_data(df, df_dims):
@@ -40,11 +23,18 @@ def check_data(df, df_dims):
     return
 
 
-df = scrape_data()
-df_dims = df[['model', 'brand', 'bodyType']].drop_duplicates()
+scrape_db = False
+update_db = False
 
-df_dims = munge_dim_table(df_dims)
-df = munge_df(df, df_dims)
+if scrape_db:
+    df_fact, df_dims = scrape_data(2)
 
-write_to_db(df, 'listings_fact')
-write_to_db(df_dims, 'model_dims')
+    if update_db:
+        write_to_db(df_fact, 'listings_fact')
+        write_to_db(df_dims, 'model_dims')
+else:
+    df_fact = query_db('SELECT * from listings_fact')
+    df_dims = query_db('SELECT * from model_dims')
+
+
+print(df_fact)
